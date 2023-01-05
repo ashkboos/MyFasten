@@ -50,13 +50,13 @@ public class ClassHierarchy {
     public static final String OBJECT_TYPE = "/java.lang/Object";
     private static final Logger logger = LoggerFactory.getLogger(ClassHierarchy.class);
 
-    private Map<String, Map<String, Long>> definedMethods;
+    private Map<String, Map<String, Long>> definedType2Sig2Id;
     private Map<String, Set<String>> universalChildren;
     private Map<String, List<String>> universalParents;
-    private Map<String, Map<String, Long>> abstractMethods;
+    private Map<String, Map<String, Long>> abstractType2Sig2Id;
 
-    public Map<String, Map<String, Long>> getDefinedMethods() {
-        return definedMethods;
+    public Map<String, Map<String, Long>> getDefinedType2Sig2Id() {
+        return definedType2Sig2Id;
     }
 
     public Map<String, Set<String>> getUniversalChildren() {
@@ -89,8 +89,8 @@ public class ClassHierarchy {
             .forEach((k, v) -> this.universalChildren.put(k, new HashSet<>(v)));
         this.universalParents = new HashMap<>(universalCHA.getLeft().size());
         universalCHA.getLeft().forEach((k, v) -> this.universalParents.put(k, new ArrayList<>(v)));
-        this.definedMethods = createTypeDictionary(dependencySet);
-        this.abstractMethods = new HashMap<>();
+        this.definedType2Sig2Id = createTypeDictionary(dependencySet);
+        this.abstractType2Sig2Id = new HashMap<>();
     }
 
 
@@ -384,9 +384,9 @@ public class ClassHierarchy {
     }
 
     private void propagateInheritedMethodsToDefinedMethods() {
-        for (final var cur : this.definedMethods.entrySet()) {
+        for (final var cur : this.definedType2Sig2Id.entrySet()) {
             final var curUri = cur.getKey();
-            for (final var curMethodSig2Id : this.definedMethods.get(curUri).entrySet()) {
+            for (final var curMethodSig2Id : this.definedType2Sig2Id.get(curUri).entrySet()) {
                 final var curMethodSig = curMethodSig2Id.getKey();
                 final var curChildren = this.universalChildren.get(curUri);
                 if (curChildren == null) {
@@ -394,7 +394,7 @@ public class ClassHierarchy {
                 }
                 for (final var childUri : curChildren) {
                     final var childMethodSig2Id =
-                        this.definedMethods.getOrDefault(childUri, new HashMap<>());
+                        this.definedType2Sig2Id.getOrDefault(childUri, new HashMap<>());
                     final var idInChild = childMethodSig2Id.get(curMethodSig);
                     if (idInChild == null) {
                         final var childParents = universalParents.get(childUri);
@@ -403,7 +403,7 @@ public class ClassHierarchy {
                         }
                         for (final var childsParent : childParents) {
                             final var childsParentMethods =
-                                this.definedMethods.getOrDefault(childsParent, new HashMap<>());
+                                this.definedType2Sig2Id.getOrDefault(childsParent, new HashMap<>());
                             final var id = childsParentMethods.get(curMethodSig);
                             if (id != null) {
                                 childMethodSig2Id.put(curMethodSig, id);
@@ -418,8 +418,8 @@ public class ClassHierarchy {
 
     private void setDefinedAndAbstractMethods(final List<PartialJavaCallGraph> dependencySet,
                                               final BiMap<Long, String> globalUris) {
-        this.definedMethods = new Object2ObjectOpenHashMap<>();
-        this.abstractMethods = new Object2ObjectOpenHashMap<>();
+        this.definedType2Sig2Id = new Object2ObjectOpenHashMap<>();
+        this.abstractType2Sig2Id = new Object2ObjectOpenHashMap<>();
         for (final var rcg : dependencySet) {
             final var localUris = rcg.mapOfFullURIStrings();
             for (final var entry : rcg.getClassHierarchy().get(JavaScope.internalTypes)
@@ -430,15 +430,15 @@ public class ClassHierarchy {
                 final var abstractMethods =
                     CollectionUtils.subtract(javaType.getMethods().values(), definedMethods);
 
-                for (final var method1 : definedMethods) {
-                    final var localId = javaType.getMethodKey(method1);
+                for (final var definedMethod : definedMethods) {
+                    final var localId = javaType.getMethodKey(definedMethod);
                     final var id = globalUris.inverse().get(localUris.get(localId));
-                    putMethods(this.definedMethods, id, typeUri, method1);
+                    putMethods(this.definedType2Sig2Id, id, typeUri, definedMethod);
                 }
-                for (final var method : abstractMethods) {
-                    final var localId = javaType.getMethodKey(method);
+                for (final var abstractMethod : abstractMethods) {
+                    final var localId = javaType.getMethodKey(abstractMethod);
                     final var id = globalUris.inverse().get(localUris.get(localId));
-                    putMethods(this.abstractMethods, id, typeUri, method);
+                    putMethods(this.abstractType2Sig2Id, id, typeUri, abstractMethod);
                 }
             }
         }
@@ -454,7 +454,7 @@ public class ClassHierarchy {
         }
     }
 
-    public Map<String, Map<String, Long>> getAbstractMethods() {
-        return abstractMethods;
+    public Map<String, Map<String, Long>> getAbstractType2Sig2Id() {
+        return abstractType2Sig2Id;
     }
 }
