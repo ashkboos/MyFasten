@@ -61,6 +61,7 @@ public class CGMerger {
     private static final Logger logger = LoggerFactory.getLogger(CGMerger.class);
 
     private final ClassHierarchy classHierarchy;
+    private Map<String, String> toPruneSig2Type = new HashMap<>();
 
     private DSLContext dbContext;
     private RocksDao rocksDao;
@@ -87,6 +88,42 @@ public class CGMerger {
      */
     public CGMerger(final List<PartialJavaCallGraph> dependencySet) {
         this(dependencySet, false);
+    }
+
+    public CGMerger(final List<PartialJavaCallGraph> dependencySet,
+                    final Map<String, String> toPruneSig2Type) {
+        this(dependencySet, false);
+        this.toPruneSig2Type = toPruneSig2Type;
+    }
+
+    /**
+     * Create instance of callgraph merger from package names.
+     *
+     * @param dependencySet coordinates of dependencies present in the resolution
+     * @param dbContext     DSL context
+     * @param rocksDao      rocks DAO
+     */
+    public CGMerger(final List<String> dependencySet,
+                    final DSLContext dbContext, final RocksDao rocksDao) {
+        this.dbContext = dbContext;
+        this.rocksDao = rocksDao;
+        this.dependencySet = getDependenciesIds(dependencySet, dbContext);
+        this.classHierarchy = new ClassHierarchy(this.dependencySet, dbContext, rocksDao);
+    }
+
+    /**
+     * Create instance of callgraph merger from package versions ids.
+     *
+     * @param dependencySet dependencies present in the resolution
+     * @param dbContext     DSL context
+     * @param rocksDao      rocks DAO
+     */
+    public CGMerger(final Set<Long> dependencySet,
+                    final DSLContext dbContext, final RocksDao rocksDao) {
+        this.dbContext = dbContext;
+        this.rocksDao = rocksDao;
+        this.dependencySet = dependencySet;
+        this.classHierarchy = new ClassHierarchy(dependencySet, dbContext, rocksDao);
     }
 
     /**
@@ -154,36 +191,6 @@ public class CGMerger {
         pcg.getClassHierarchy().get(JavaScope.internalTypes)
             .forEach((key, value) -> value.getMethods().keySet().forEach(nodeAddingFunction));
         return nodes;
-    }
-
-    /**
-     * Create instance of callgraph merger from package names.
-     *
-     * @param dependencySet coordinates of dependencies present in the resolution
-     * @param dbContext     DSL context
-     * @param rocksDao      rocks DAO
-     */
-    public CGMerger(final List<String> dependencySet,
-                    final DSLContext dbContext, final RocksDao rocksDao) {
-        this.dbContext = dbContext;
-        this.rocksDao = rocksDao;
-        this.dependencySet = getDependenciesIds(dependencySet, dbContext);
-        this.classHierarchy = new ClassHierarchy(this.dependencySet, dbContext, rocksDao);
-    }
-
-    /**
-     * Create instance of callgraph merger from package versions ids.
-     *
-     * @param dependencySet dependencies present in the resolution
-     * @param dbContext     DSL context
-     * @param rocksDao      rocks DAO
-     */
-    public CGMerger(final Set<Long> dependencySet,
-                    final DSLContext dbContext, final RocksDao rocksDao) {
-        this.dbContext = dbContext;
-        this.rocksDao = rocksDao;
-        this.dependencySet = dependencySet;
-        this.classHierarchy = new ClassHierarchy(dependencySet, dbContext, rocksDao);
     }
 
     /**
@@ -297,12 +304,24 @@ public class CGMerger {
                     final boolean isCallback) {
         boolean resolved = false;
         final Set<String> emptySet = new HashSet<>();
-        Map<String, Map<String, Long>> definedMethods = this.classHierarchy.getDefinedMethods();
-        Map<String, List<String>> universalParents = this.classHierarchy.getUniversalParents();
+        Map<String, Map<String, Long>> definedMethods = this.classHierarchy.getDefinedType2Sig2Id();
         Map<String, Set<String>> universalChildren = this.classHierarchy.getUniversalChildren();
+        Map<String, String> toPruneSig2Type = this.toPruneSig2Type;
+
         final var targetSignature = callSite.targetSignature;
 
         for (final var receiverTypeUri : callSite.receiverTypes) {
+            // prune if possible
+            final var blackType = toPruneSig2Type.get(targetSignature);
+            if (blackType != null){
+                final var blackChildren = universalChildren.get(blackType);
+                if (blackChildren != null) {
+                    if (blackChildren.contains(receiverTypeUri)) {
+                        continue;
+                    }
+                }
+            }
+            // merge
             var targets = new LongOpenHashSet();
 
             switch (callSite.invocationInstruction) {
