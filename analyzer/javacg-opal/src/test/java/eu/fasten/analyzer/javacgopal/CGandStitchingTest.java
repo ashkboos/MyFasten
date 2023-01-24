@@ -23,18 +23,29 @@ import static eu.fasten.analyzer.javacgopal.data.CGAlgorithm.RTA;
 import static eu.fasten.core.data.CallPreservationStrategy.ONLY_STATIC_CALLSITES;
 import static eu.fasten.core.merge.CallGraphUtils.decode;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.github.javaparser.utils.Log;
+import com.ibm.wala.ipa.callgraph.CallGraph;
+import com.ibm.wala.ipa.cha.ClassHierarchyException;
+import com.ibm.wala.util.CancelException;
 import eu.fasten.analyzer.javacgopal.data.OPALCallGraphConstructor;
 import eu.fasten.analyzer.javacgopal.data.OPALPartialCallGraphConstructor;
+import eu.fasten.analyzer.javacgwala.data.callgraph.Algorithm;
+import eu.fasten.analyzer.javacgwala.data.callgraph.CallGraphConstructor;
+import eu.fasten.analyzer.javacgwala.data.callgraph.PartialCallGraphGenerator;
+import eu.fasten.analyzer.javacgwala.data.callgraph.analyzer.WalaResultAnalyzer;
 import eu.fasten.analyzer.sourceanalyzer.CommentParser;
+import eu.fasten.core.data.CallPreservationStrategy;
 import eu.fasten.core.data.ClassHierarchy;
+import eu.fasten.core.data.Constants;
+import eu.fasten.core.data.JavaGraph;
 import eu.fasten.core.data.PartialJavaCallGraph;
+import eu.fasten.core.data.callableindex.SourceCallSites;
 import eu.fasten.core.data.opal.MavenArtifactDownloader;
 import eu.fasten.core.data.opal.MavenCoordinate;
 import eu.fasten.core.data.opal.exceptions.OPALException;
+import eu.fasten.core.maven.utils.MavenUtilities;
 import eu.fasten.core.merge.CGMerger;
 import eu.fasten.core.merge.CallGraphUtils;
 import it.unimi.dsi.fastutil.longs.LongLongPair;
@@ -42,9 +53,6 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -70,7 +78,8 @@ import org.junit.jupiter.api.Test;
 public class CGandStitchingTest {
 
     public static PartialJavaCallGraph getRCG(final String path, final String product,
-                                              final String version) throws OPALException, URISyntaxException {
+                                              final String version)
+        throws OPALException, URISyntaxException {
         final var file =
             new File(Objects.requireNonNull(Thread.currentThread().getContextClassLoader()
                 .getResource(path)).toURI().getPath());
@@ -90,7 +99,8 @@ public class CGandStitchingTest {
     public void staticInitializer() throws OPALException, URISyntaxException {
         final var importer = getRCG("merge/staticInitializer/Importer.class", "importer", "0.0.0");
         final var imported = getRCG("merge/staticInitializer/Imported.class", "imported", "1.1.1");
-        Assertions.assertEquals("/merge.staticInitializer/Importer.<init>()/java.lang/VoidType '->'\n" +
+        Assertions.assertEquals(
+            "/merge.staticInitializer/Importer.<init>()/java.lang/VoidType '->'\n" +
                 "/java.lang/Object.<init>()/java.lang/VoidType\n" +
                 "\n" +
                 "/merge.staticInitializer/Importer.sourceMethod()/java.lang/VoidType '->'\n" +
@@ -135,17 +145,20 @@ public class CGandStitchingTest {
         final var merged = merge(user, new CGMerger(deps));
 
         Assertions.assertEquals(
-                "fasten://mvn!User.class$0.0.0/merge.hashCode/User.main(/java.lang/String[])/java.lang/VoidType '->'\n" +
+            "fasten://mvn!User.class$0.0.0/merge.hashCode/User.main(/java.lang/String[])/java.lang/VoidType '->'\n" +
                 "fasten://mvn!Parent.class$0.0.0/merge.hashCode/Parent.hashCode()/java.lang/IntegerType\n\n",
             toString(merged));
 
     }
 
-    private List<PartialJavaCallGraph> getDepSet(final String path) throws OPALException, URISyntaxException {
+    private List<PartialJavaCallGraph> getDepSet(final String path)
+        throws OPALException, URISyntaxException {
         final List<PartialJavaCallGraph> result = new ArrayList<>();
 
-        final var depFiles = new File(Objects.requireNonNull(Thread.currentThread().getContextClassLoader()
-            .getResource(path)).toURI().getPath()).listFiles(f -> f.getPath().endsWith(".class"));
+        final var depFiles =
+            new File(Objects.requireNonNull(Thread.currentThread().getContextClassLoader()
+                .getResource(path)).toURI().getPath()).listFiles(
+                f -> f.getPath().endsWith(".class"));
         for (final var depFile : depFiles) {
             if (!depFile.getName().contains(" ")) {
                 result.add(getRCG(depFile, depFile.getName(), "0.0.0"));
@@ -161,7 +174,7 @@ public class CGandStitchingTest {
         Supplier<Stream<String>> projects = () -> Stream.of("app", "dep1", "dep2");
         final var version = "1.0";
 
-        final var expected = new HashMap<String,Set<String>>();
+        final var expected = new HashMap<String, Set<String>>();
         projects.get().forEach(p -> expected.putAll(getExpected(p)));
         expected.putAll(getOtherPackages());
 
@@ -239,14 +252,16 @@ public class CGandStitchingTest {
             List.of("/implementedmethod/AKlass", "/java.lang/Object", "/implementedmethod/IInter"),
             classHierarchy.getUniversalParents().get("/implementedmethod/BKlass"));
 
-        assertEquals(List.of("/implementedmethod/BKlass", "/implementedmethod/AKlass", "/java.lang/Object",
-                 "/implementedmethod/IInter"),
+        assertEquals(
+            List.of("/implementedmethod/BKlass", "/implementedmethod/AKlass", "/java.lang/Object",
+                "/implementedmethod/IInter"),
             classHierarchy.getUniversalParents().get("/implementedmethod/CKlass"));
 
         assertEquals(List.of("/java.lang/Object"),
             classHierarchy.getUniversalParents().get("/implementedmethod/IInter"));
 
-        assertEquals(List.of("/inheritedandsubtyped/BClass", "/inheritedandsubtyped/AClass", "/java.lang/Object" , "/inheritedandsubtyped/IInterface"),
+        assertEquals(List.of("/inheritedandsubtyped/BClass", "/inheritedandsubtyped/AClass",
+                "/java.lang/Object", "/inheritedandsubtyped/IInterface"),
             classHierarchy.getUniversalParents().get("/inheritedandsubtyped/CClass"));
 
         assertEquals(List.of("/apppackage/App", "/java.lang/Object", "/apppackage/AppInterface"),
@@ -276,21 +291,25 @@ public class CGandStitchingTest {
     }
 
     private Map<String, Set<String>> getExpected(final String artifact) {
-        return new CommentParser().extractComments("src/test/resources/merge/annotated-tests/"+artifact+
-            "/src/main/java", artifact+"package");
+        return new CommentParser().extractComments(
+            "src/test/resources/merge/annotated-tests/" + artifact +
+                "/src/main/java", artifact + "package");
     }
 
     private PartialJavaCallGraph generate(final String base, final String artifact,
                                           final String version) {
         try {
-            return getRCG(base+"/"+artifact+"/target/"+artifact+"-"+version+"-SNAPSHOT.jar", artifact,
+            return getRCG(
+                base + "/" + artifact + "/target/" + artifact + "-" + version + "-SNAPSHOT.jar",
+                artifact,
                 version);
         } catch (OPALException | URISyntaxException e) {
             e.printStackTrace();
         }
         return null;
     }
-    public static Map<String,Set<String>> toMap(final List<Pair<String, String>> nodePairs) {
+
+    public static Map<String, Set<String>> toMap(final List<Pair<String, String>> nodePairs) {
         Map<String, Set<String>> result = new HashMap<>();
         for (final var edge : nodePairs) {
             final var source =
@@ -304,7 +323,7 @@ public class CGandStitchingTest {
         return result;
     }
 
-    public static Map<String,Set<String>> toMap(final Map<String,
+    public static Map<String, Set<String>> toMap(final Map<String,
         List<Pair<String, String>>> nodePairs) {
         Map<String, Set<String>> result = new HashMap<>();
         for (final var edge : aggregateAllEdges(nodePairs)) {
@@ -330,36 +349,40 @@ public class CGandStitchingTest {
 
     private static String getMethod(final String uri) {
         final var decodedUri = java.net.URLDecoder.decode(uri, StandardCharsets.UTF_8);
-        var partialUriFormatException = "Invalid partial FASTEN URI. The format is corrupted.\nMust be: `/{namespace}/{class}.{method}({signature.args})/{signature.returnType}`";
+        var partialUriFormatException =
+            "Invalid partial FASTEN URI. The format is corrupted.\nMust be: `/{namespace}/{class}.{method}({signature.args})/{signature.returnType}`";
 
         // Method: `.{method}(`
         Pattern methodNamePattern = Pattern.compile("(?<=\\.)([^.]+)(?=\\()");
         Matcher methodNameMatcher = methodNamePattern.matcher(decodedUri);
-        if (!methodNameMatcher.find() || methodNameMatcher.group(0).isEmpty())
+        if (!methodNameMatcher.find() || methodNameMatcher.group(0).isEmpty()) {
             throw new IllegalArgumentException(partialUriFormatException);
+        }
 
         var method = methodNameMatcher.group(0) + "(";
         final var params = StringUtils.substringBetween(uri, "(", ")").split(",");
         for (String param : params) {
             param = decode(param);
             final var paramUri = param.split("/");
-            final var paramCLas = paramUri[paramUri.length-1];
+            final var paramCLas = paramUri[paramUri.length - 1];
             method = method + paramCLas + ",";
         }
-        if (params.length!=0) {
+        if (params.length != 0) {
             method = StringUtils.removeEnd(method, ",");
         }
         return method + ")";
     }
 
-    private static String getClass(final String uri){
+    private static String getClass(final String uri) {
         // Class: `/{class}.*(`
         Pattern classPattern = Pattern.compile("(?<=/)([^\\/]+)(?=\\.([^./]+)\\()");
-        var partialUriFormatException = "Invalid partial FASTEN URI. The format is corrupted.\nMust be: `/{namespace}/{class}.{method}({signature.args})/{signature.returnType}`";
+        var partialUriFormatException =
+            "Invalid partial FASTEN URI. The format is corrupted.\nMust be: `/{namespace}/{class}.{method}({signature.args})/{signature.returnType}`";
 
         Matcher classMatcher = classPattern.matcher(uri);
-        if (!classMatcher.find() || classMatcher.group(0).isEmpty())
+        if (!classMatcher.find() || classMatcher.group(0).isEmpty()) {
             throw new IllegalArgumentException(partialUriFormatException);
+        }
         var result = classMatcher.group(0);
         if (classMatcher.group(0).contains("$")) {
             result = StringUtils.substringAfter(classMatcher.group(0), "$");
@@ -384,19 +407,19 @@ public class CGandStitchingTest {
 
     @Test
     public void virtualReceiverTypes() throws OPALException, URISyntaxException {
-        var cg = getRCG("merge/hashCode/complex/User.class","importer","0.0.0");
-        assertReceiver(cg, "invokedynamic","[/merge.hashCode.complex/Child]");
-        cg = getRCG("merge/hashCode/interFace/User.class","importer","0.0.0");
-        assertReceiver(cg, "invokeinterface","[/merge.hashCode.interFace/Child]");
-        cg = getRCG("merge/hashCode/User.class","importer","0.0.0");
-        assertReceiver(cg, "invokedynamic","[/merge.interFace/Child]");
+        var cg = getRCG("merge/hashCode/complex/User.class", "importer", "0.0.0");
+        assertReceiver(cg, "invokedynamic", "[/merge.hashCode.complex/Child]");
+        cg = getRCG("merge/hashCode/interFace/User.class", "importer", "0.0.0");
+        assertReceiver(cg, "invokeinterface", "[/merge.hashCode.interFace/Child]");
+        cg = getRCG("merge/hashCode/User.class", "importer", "0.0.0");
+        assertReceiver(cg, "invokedynamic", "[/merge.interFace/Child]");
 
     }
 
-    public void assertReceiver(PartialJavaCallGraph cg, String callType, String type){
+    public void assertReceiver(PartialJavaCallGraph cg, String callType, String type) {
         for (final var edge : cg.getGraph().getCallSites().entrySet()) {
             for (final var cs : edge.getValue().entrySet()) {
-                final var metadata = (Map<Object,Object>)cs.getValue();
+                final var metadata = (Map<Object, Object>) cs.getValue();
                 if ((metadata.get("type").equals(callType))) {
                     Assertions.assertEquals(type, metadata.get("receiver"));
                 }
@@ -406,9 +429,10 @@ public class CGandStitchingTest {
 
     @Test
     public void missingEdges() throws OPALException, URISyntaxException {
-        final var cg = getRCG("merge/missingEdge/User.class","importer","0.0.0");
-        assertTrue(toString(cg).contains("/merge.missingEdge/User.main(/java.lang/String[])/java.lang/VoidType '->'\n" +
-            "/merge.missingEdge/Child.hashCode()/java.lang/IntegerType"));
+        final var cg = getRCG("merge/missingEdge/User.class", "importer", "0.0.0");
+        assertTrue(toString(cg).contains(
+            "/merge.missingEdge/User.main(/java.lang/String[])/java.lang/VoidType '->'\n" +
+                "/merge.missingEdge/Child.hashCode()/java.lang/IntegerType"));
     }
 
     @Disabled
@@ -424,37 +448,93 @@ public class CGandStitchingTest {
     }
 
     private PartialJavaCallGraph getRCG(String coordStr) {
-        final var coord = MavenCoordinate.fromString(coordStr,"jar");
+        final var coord = MavenCoordinate.fromString(coordStr, "jar");
 
         // TODO: avoid downloading JARs when testing on every build
         final var dep1 =
             new MavenArtifactDownloader(coord).downloadArtifact("jar");
         final var opalCG = new OPALCallGraphConstructor().construct(dep1, RTA);
-        final var cg = new OPALPartialCallGraphConstructor().construct(opalCG, ONLY_STATIC_CALLSITES);
-        return new PartialJavaCallGraph("", coord.getProduct(), coord.getVersionConstraint(), -1, "", cg.classHierarchy, cg.graph);
+        final var cg =
+            new OPALPartialCallGraphConstructor().construct(opalCG, ONLY_STATIC_CALLSITES);
+        return new PartialJavaCallGraph("", coord.getProduct(), coord.getVersionConstraint(), -1,
+            "", cg.classHierarchy, cg.graph);
     }
-
 
     @Test
-    public void convertToArtifacts(){
-        var filePath = "/Users/mehdi/Downloads/artifacts.txt";
-        String fileContent = "";
-        try
-        {
-            byte[] bytes = Files.readAllBytes(Paths.get(filePath));
-            fileContent = new String (bytes);
-            var lines = fileContent.split("\n");
-            StringBuilder result = new StringBuilder();
-            for (String line : lines) {
-                var gav = line.split(":");
-                final var ga = gav[0] + ":" + gav[1];
-                result.append("'").append(ga).append("'").append(",");
+    public void testSourceCallSites() {
+        final var coord = "org.springframework.hateoas:spring-hateoas:0.19.0.RELEASE";
+        final var mavenCoordinate = MavenCoordinate.fromString(coord, "jar");
+        Set<String> sigsInSourceCS = new HashSet<>();
+        final var pcg = generateWALAForCoord(mavenCoordinate, false);
+        var methods = pcg.mapOfAllMethods();
+        Set<String> sigsInCG = new HashSet<>();
+        for (var edge : pcg.getCallSites().entrySet()) {
+            sigsInCG.add(methods.get(edge.getKey().secondLong()).getSignature());
+        }
+        assertEquals(1662, pcg.getCallSites().size());
+
+        pcg.setSourceCallSites();
+        for (final var source : pcg.sourceCallSites.sourceId2SourceInf.long2ObjectEntrySet()) {
+            for (SourceCallSites.CallSite callSite : source.getValue().callSites) {
+                sigsInSourceCS.add(callSite.targetSignature);
             }
-            System.out.println();
         }
-        catch (IOException e)
-        {
-            e.printStackTrace();
-        }
+        assertEquals(543, pcg.sourceCallSites.sourceId2SourceInf.size());
+        assertEquals(520, sigsInCG.size());
+        assertEquals( 520, sigsInSourceCS.size());
     }
+
+    @Test
+    public void testMergedWalaNodeNum() {
+        final var coords =
+            "org.springframework.hateoas:spring-hateoas:0.19.0.RELEASE;org.springframework:spring-aop:4.1" +
+                ".7.RELEASE;aopalliance:aopalliance:1.0;org.springframework:spring-beans:4.1.7.RELEASE;org.springframework:spring-context:4.1.7.RELEASE;org.springframework:spring-expression:4.1.7.RELEASE;org.springframework:spring-core:4.1.7.RELEASE;org.springframework:spring-web:4.1.7.RELEASE;org.springframework:spring-webmvc:4.1.7.RELEASE;org.slf4j:slf4j-api:1.7.12;com.fasterxml.jackson.core:jackson-databind:2.9.8";
+        List<MavenCoordinate> depSet = new ArrayList<>();
+        for (final var coord : coords.split(";")) {
+            final var mavenCoordinate = MavenCoordinate.fromString(coord, "jar");
+            depSet.add(mavenCoordinate);
+        }
+        List<PartialJavaCallGraph> depSetCGs = new ArrayList<>();
+        for (final var coord : depSet) {
+            final PartialJavaCallGraph pcg = generateWALAForCoord(coord, true);
+            depSetCGs.add(pcg);
+        }
+
+        CGMerger merger = new CGMerger(depSetCGs);
+        final var cg = merger.mergeWithCHA(depSetCGs.get(0));
+        assertEquals( 1584, cg.numNodes());
+        assertEquals( 8298, cg.numArcs());
+    }
+
+    private PartialJavaCallGraph generateWALAForCoord(final MavenCoordinate coord, boolean partial) {
+        final var file =
+            (new MavenArtifactDownloader(coord)).downloadArtifact(
+                MavenUtilities.MAVEN_CENTRAL_REPO);
+
+        return generateWala(file.getAbsolutePath(), coord, partial);
+    }
+
+    private PartialJavaCallGraph generateWala(final String path,
+                                              final MavenCoordinate mavenCoordinate,
+                                              boolean partial) {
+        final CallGraph callgraph;
+        try {
+            callgraph = CallGraphConstructor.generateCallGraph(path, Algorithm.CHA);
+        } catch (IOException | ClassHierarchyException | CancelException e) {
+            throw new RuntimeException(e);
+        }
+
+        final var pcg =
+            PartialCallGraphGenerator.generateEmptyPCG(Constants.mvnForge,
+                mavenCoordinate.getProduct(), mavenCoordinate.getVersionConstraint(), -1,
+                Constants.walaGenerator);
+
+        WalaResultAnalyzer.wrap(callgraph, pcg, CallPreservationStrategy.ONLY_STATIC_CALLSITES);
+        if (partial) {
+            pcg.setSourceCallSites();
+            pcg.setGraph(new JavaGraph());
+        }
+        return pcg;
+    }
+
 }
