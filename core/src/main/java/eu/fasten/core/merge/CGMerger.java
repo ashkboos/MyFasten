@@ -213,7 +213,9 @@ public class CGMerger {
     public DirectedGraph mergeWithCHA(final PartialJavaCallGraph cg) {
         for (final var directedERCGPair : this.ercgDependencySet) {
             if (cg.uri.equals(directedERCGPair.getRight().uri)) {
-                directedERCGPair.getRight().setSourceCallSites(this.allUris.inverse());
+                if (directedERCGPair.getRight().sourceCallSites == null) {
+                    directedERCGPair.getRight().setSourceCallSites(this.allUris.inverse());
+                }
                 return mergeWithCHA(directedERCGPair.getKey(),
                     directedERCGPair.getRight().sourceCallSites);
             }
@@ -304,7 +306,7 @@ public class CGMerger {
                     final boolean isCallback) {
         boolean resolved = false;
         final Set<String> emptySet = new HashSet<>();
-        Map<String, Map<String, Long>> definedMethods = this.classHierarchy.getDefinedType2Sig2Id();
+        Map<String, Map<String, Long>> definedType2Sig2Id = this.classHierarchy.getDefinedType2Sig2Id();
         Map<String, Set<String>> universalChildren = this.classHierarchy.getUniversalChildren();
         Map<String, String> toPruneSig2Type = this.toPruneSig2Type;
 
@@ -330,7 +332,7 @@ public class CGMerger {
                     final var children = universalChildren.getOrDefault(receiverTypeUri, emptySet);
                     children.add(receiverTypeUri);
                     for (final var child : children) {
-                        final var childMethods = definedMethods.get(child);
+                        final var childMethods = definedType2Sig2Id.get(child);
                         if (childMethods != null) {
                             final var target = childMethods.get(targetSignature);
                             if (target != null) {
@@ -341,8 +343,7 @@ public class CGMerger {
                     break;
 
                 default:
-                    final var receiverMethods = definedMethods.get(receiverTypeUri);
-
+                    final var receiverMethods = definedType2Sig2Id.get(receiverTypeUri);
                     if (receiverMethods != null) {
                         final var target = receiverMethods.get(targetSignature);
                         if (target != null) {
@@ -443,7 +444,7 @@ public class CGMerger {
                 result.addEdge(longLongPair.firstLong(), longLongPair.secondLong());
             }
         }
-        logger.info("Number of Augmented nodes: {} edges: {}", numNode, result.numArcs());
+        logger.info("Number of Augmented nodes: {} edges: {}", result.numNodes(), result.numArcs());
 
         return result;
     }
