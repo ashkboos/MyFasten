@@ -29,6 +29,7 @@ import java.nio.file.Files;
 import java.util.HashSet;
 import java.util.List;
 
+import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.json.JSONObject;
 import org.junit.jupiter.api.AfterEach;
@@ -114,18 +115,20 @@ public class RocksDaoTest {
         assertEquals(new HashSet<>(graph.getNodes()), graph.getGidToUriMap().keySet());
 
         final SourceCallSites graphMetadata = rocksDao.getGraphMetadata(graph.getIndex(), graphData);
-		assertEquals(
-                new SourceCallSites.SourceMethodInf("/java.lang/String", "get()/java.lang/long",
-						List.of(new CallSite(5, STATIC, "put()/java.lang/long", List.of("/java.lang/String", "/product/Interface")), new CallSite(12, STATIC, "put()/java.lang/long", List.of("/java.lang/String", "/product/Interface")))),
-                graphMetadata.sourceId2SourceInf.get(0));
+        final var expected =
+            new SourceCallSites.SourceMethodInf("/java.lang/String", "get()/java.lang/long",
+                Set.of(new CallSite(5, STATIC, "hashCode()/java.lang/int", List.of("/java" +
+                        ".lang/String", "/product/Interface")),
+                    new CallSite(12, STATIC, "method(/my.package/int)/my.package/int",
+                        List.of("/java.lang/String", "/product/Interface"))));
+        assertEquals(expected, graphMetadata.sourceId2SourceInf.get(0));
         assertEquals(
                 new SourceCallSites.SourceMethodInf("/java.lang/Object", "hashCode()/java.lang/int",
-						List.of(new CallSite(25, DYNAMIC, "equals()/java.lang/long", List.of("/java.lang/Object")))),
+                    Set.of(new CallSite(25, DYNAMIC, "method(/my.package/int)/my.package/int", List.of("/java.lang/Object")))),
                 graphMetadata.sourceId2SourceInf.get(1));
         assertEquals(
                 new SourceCallSites.SourceMethodInf("/my.package/Klass", "method(/my.package/int)/my.package/int",
-                        List.of()),
-				graphMetadata.sourceId2SourceInf.get(2));
+                    Set.of()), graphMetadata.sourceId2SourceInf.get(2));
     }
 
     @Test

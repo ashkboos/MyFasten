@@ -455,10 +455,10 @@ public class RocksDao implements Closeable {
                 final String signature = readString(fbais);
 
                 final long length = readLong(fbais);
-                List<CallSite> list;
-                if (length == 0) list = Collections.emptyList();
+                Set<CallSite> set;
+                if (length == 0) set = Collections.emptySet();
                 else {
-                    list = new ArrayList<>();
+                    set = new HashSet<>();
 					for (long i = 0; i < length; i++) {
 						final int line = (int)readLong(fbais);
 						final InvocationInstruction callType = InvocationInstruction.values()[(int)readLong(fbais)];
@@ -466,12 +466,12 @@ public class RocksDao implements Closeable {
 						final int size = (int)readLong(fbais);
 						final ArrayList<String> t = new ArrayList<>();
 						for (int j = 0; j < size; j++) t.add(readString(fbais));
-						list.add(new SourceCallSites.CallSite(line, callType, receiverSignature, t));
+						set.add(new SourceCallSites.CallSite(line, callType, receiverSignature, t));
 					}
                 }
 
                 // Make the list immutable
-                map.put(node, new SourceMethodInf(type, signature, List.copyOf(list)));
+                map.put(node, new SourceMethodInf(type, signature, set));
             }
         } catch (final IOException cantHappen) {
             // Not really I/O

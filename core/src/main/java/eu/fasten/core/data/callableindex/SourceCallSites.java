@@ -25,6 +25,7 @@ import eu.fasten.core.utils.FastenUriUtils;
 import it.unimi.dsi.fastutil.HashCommon;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import java.util.List;
+import java.util.Set;
 import org.apache.commons.lang.StringUtils;
 
 /**
@@ -47,18 +48,18 @@ public class SourceCallSites {
 
         public final String sourceUri;
         /**
-         * The list of receivers.
+         * The set of call sites.
          */
-        public final List<CallSite> callSites;
+        public final Set<CallSite> callSites;
 
         public SourceMethodInf(String sourceUri,
-                               List<CallSite> callSites) {
+                               Set<CallSite> callSites) {
             this.sourceUri = sourceUri;
             this.callSites = callSites;
         }
 
         public SourceMethodInf(final String type, final String sourceSignature,
-                               final List<CallSite> callSites) {
+                               final Set<CallSite> callSites) {
             this.sourceUri = type + "." + sourceSignature;
             this.callSites = callSites;
         }
@@ -158,14 +159,14 @@ public class SourceCallSites {
 
         @Override
         public String toString() {
-            return "{line: " + line + ", type: " + invocationInstruction + ", receiverUris: " +
-                receiverTypes + "}";
+            return "{line: " + line + ", signature: " + targetSignature +", type: "
+                + invocationInstruction + ", receiverUris: " + receiverTypes + "}";
         }
 
         @Override
         public int hashCode() {
             return HashCommon.mix(
-                line + invocationInstruction.ordinal() + receiverTypes.hashCode());
+                line + invocationInstruction.ordinal() + targetSignature.hashCode() + receiverTypes.hashCode());
         }
 
         @Override
@@ -184,6 +185,9 @@ public class SourceCallSites {
                 return false;
             }
             if (invocationInstruction != other.invocationInstruction) {
+                return false;
+            }
+            if (!targetSignature.equals(other.targetSignature)) {
                 return false;
             }
             return receiverTypes.equals(other.receiverTypes);

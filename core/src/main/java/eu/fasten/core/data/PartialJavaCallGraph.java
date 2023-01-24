@@ -64,10 +64,8 @@ public class PartialJavaCallGraph extends PartialCallGraph {
             final var globalSource = wholeProgramUris.get(sourceFullUri);
             var value = map.get(globalSource.longValue());
             if (value == null) {
-                value = new SourceCallSites.SourceMethodInf(sourceFullUri, new ArrayList<>(receivers));
+                value = new SourceCallSites.SourceMethodInf(sourceFullUri, receivers);
             } else {
-                receivers.addAll(value.callSites);
-                value.callSites.removeAll(receivers);
                 value.callSites.addAll(receivers);
             }
             map.put(globalSource.longValue(), value);

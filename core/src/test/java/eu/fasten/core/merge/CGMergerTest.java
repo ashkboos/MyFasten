@@ -143,11 +143,11 @@ public class CGMergerTest {
         var gid2nodeMap = new Long2ObjectOpenHashMap<SourceCallSites.SourceMethodInf>();
         gid2nodeMap.put(MAIN_INIT,
             new SourceCallSites.SourceMethodInf("/test.group/Main", "<init>()/java.lang/VoidType",
-                List.of(new SourceCallSites.CallSite(6,
+                Set.of(new SourceCallSites.CallSite(6,
                     SourceCallSites.CallSite.InvocationInstruction.SPECIAL, "<init>()VoidType",
                     List.of("/java.lang/Object")))));
         gid2nodeMap.put(MAIN_MAIN_METHOD, new SourceCallSites.SourceMethodInf("/test.group/Main",
-            "main(/java.lang/String[])/java.lang/VoidType", List.of(
+            "main(/java.lang/String[])/java.lang/VoidType", Set.of(
             new SourceCallSites.CallSite(8, SourceCallSites.CallSite.InvocationInstruction.SPECIAL,
                 "<init>(/java.lang/IntegerType,/java.lang/IntegerType,/java.lang/IntegerType)/java.lang/VoidType",
                 List.of("/test.group/Baz")),
@@ -163,15 +163,15 @@ public class CGMergerTest {
         )));
         gid2nodeMap.put(BAZ_INIT, new SourceCallSites.SourceMethodInf("/test.group/Baz",
             "<init>(/java.lang/IntegerType,/java.lang/IntegerType,/java.lang/IntegerType)/java.lang/VoidType",
-            List.of()));
+            Set.of()));
         gid2nodeMap.put(BAR_SUPER_METHOD, new SourceCallSites.SourceMethodInf("/test.group/Bar",
-            "superMethod()/java.lang/VoidType", List.of()));
+            "superMethod()/java.lang/VoidType", Set.of()));
         gid2nodeMap.put(BAR_INIT, new SourceCallSites.SourceMethodInf("/test.group/Bar",
-            "<init>(/java.lang/IntegerType,/java.lang/IntegerType)/java.lang/VoidType", List.of()));
+            "<init>(/java.lang/IntegerType,/java.lang/IntegerType)/java.lang/VoidType", Set.of()));
         gid2nodeMap.put(FOO_STATIC_METHOD, new SourceCallSites.SourceMethodInf("/test.group/Foo",
-            "staticMethod()/java.lang/IntegerType", List.of()));
+            "staticMethod()/java.lang/IntegerType", Set.of()));
         gid2nodeMap.put(FOO_INIT, new SourceCallSites.SourceMethodInf("/test.group/Foo",
-            "<init>(/java.lang/IntegerType)/java.lang/VoidType", List.of()));
+            "<init>(/java.lang/IntegerType)/java.lang/VoidType", Set.of()));
 
         //TODO add all methods to graphmetadata
         graphMetadata = new SourceCallSites(gid2nodeMap);
