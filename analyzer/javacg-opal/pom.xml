@@ -17,6 +17,21 @@
 
     <dependencies>
 		<dependency>
+			<groupId>eu.fasten.analyzer</groupId>
+			<artifactId>javacg-wala</artifactId>
+			<version>0.0.1-SNAPSHOT</version>
+			<exclusions>
+				<exclusion>
+					<groupId>org.slf4j</groupId>
+					<artifactId>slf4j-simple</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>ch.qos.logback</groupId>
+					<artifactId>logback-classic</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+		<dependency>
 			<groupId>eu.fasten</groupId>
 			<artifactId>core</artifactId>
 			<version>0.0.14-SNAPSHOT</version>
