@@ -67,7 +67,7 @@ public class CGMerger {
     private RocksDao rocksDao;
     private Set<Long> dependencySet;
 
-    private List<Pair<DirectedGraph, PartialJavaCallGraph>> ercgDependencySet;
+    public List<Pair<DirectedGraph, PartialJavaCallGraph>> ercgDependencySet;
     private BiMap<Long, String> allUris;
 
     private Map<String, Map<String, String>> externalUris;

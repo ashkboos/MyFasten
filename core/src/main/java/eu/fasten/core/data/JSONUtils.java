@@ -1,5 +1,8 @@
 package eu.fasten.core.data;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import eu.fasten.core.data.opal.MavenCoordinate;
 import it.unimi.dsi.fastutil.longs.LongLongPair;
 import java.util.HashMap;
@@ -8,6 +11,26 @@ import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
 
 public class JSONUtils {
+
+
+    public static String serializeType2JarMap(final Map<String, String> type2Jar) {
+            ObjectMapper mapper = new ObjectMapper();
+        try {
+            return mapper.writeValueAsString(type2Jar);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static Map<String, String> deserializeType2JarMap(final String serializedMap) {
+
+            ObjectMapper mapper = new ObjectMapper();
+        try {
+            return mapper.readValue(serializedMap, new TypeReference<>() {});
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
     public static String toJSONString(final DirectedGraph graph, final MavenCoordinate coordinate) {
         var result = new StringBuilder("{");
