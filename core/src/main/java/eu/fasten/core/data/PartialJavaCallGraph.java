@@ -47,11 +47,21 @@ public class PartialJavaCallGraph extends PartialCallGraph {
 
     public static final String classHierarchyJSONKey = "cha";
 
-    public void setSourceCallSites() {
-        setSourceCallSites(mapOfFullURIStrings().inverse());
+    protected EnumMap<JavaScope, Map<String, JavaType>> classHierarchy;
+
+    /**
+     * Includes all the edges of the revision call graph (internal, external,
+     * and resolved).
+     */
+    protected JavaGraph graph;
+
+    public SourceCallSites sourceCallSites;
+
+    public void setSourceCallSitesToOptimizeMerge() {
+        setSourceCallSitesToOptimizeMerge(mapOfFullURIStrings().inverse());
     }
 
-    public void setSourceCallSites(final Map<String, Long> wholeProgramUris) {
+    public void setSourceCallSitesToOptimizeMerge(final Map<String, Long> wholeProgramUris) {
         final var map = new Long2ObjectOpenHashMap<SourceCallSites.SourceMethodInf>();
         final var allMethods = mapOfAllMethods();
         final var appUris = mapOfFullURIStrings();
@@ -71,6 +81,7 @@ public class PartialJavaCallGraph extends PartialCallGraph {
             map.put(globalSource.longValue(), value);
         }
         this.sourceCallSites = new SourceCallSites(map);
+        this.graph = new JavaGraph();
     }
 
     private static Set<SourceCallSites.CallSite> toCallSites(
@@ -124,16 +135,6 @@ public class PartialJavaCallGraph extends PartialCallGraph {
         this.graph = graph;
     }
 
-    protected EnumMap<JavaScope, Map<String, JavaType>> classHierarchy;
-
-    /**
-     * Includes all the edges of the revision call graph (internal, external,
-     * and resolved).
-     */
-    protected JavaGraph graph;
-
-    public SourceCallSites sourceCallSites;
-
     public PartialJavaCallGraph(final String forge, final String product, final String version,
                                 final long timestamp, final String cgGenerator,
                                 final EnumMap<JavaScope, Map<String, JavaType>> classHierarchy,
@@ -174,7 +175,6 @@ public class PartialJavaCallGraph extends PartialCallGraph {
         this.graph = graph;
     }
 
-
     /**
      * Creates {@link PartialCallGraph} for the given JSONObject.
      *
@@ -182,8 +182,13 @@ public class PartialJavaCallGraph extends PartialCallGraph {
      */
     public PartialJavaCallGraph(final JSONObject json) throws JSONException {
         super(json);
-        this.graph = new JavaGraph(json.getJSONArray("call-sites"));
         this.classHierarchy = getCHAFromJSON(json.getJSONObject(classHierarchyJSONKey));
+        if (json.has("call-sites")) {
+            this.graph = new JavaGraph(json.getJSONArray("call-sites"));
+        }
+        if (json.has("sourceMethods")) {
+            this.sourceCallSites = new SourceCallSites(json.getJSONArray("sourceMethods"));
+        }
     }
 
     @Override
@@ -382,8 +387,12 @@ public class PartialJavaCallGraph extends PartialCallGraph {
     public JSONObject toJSON() {
         final var result = super.toJSON();
         result.put(classHierarchyJSONKey, classHierarchyToJSON(classHierarchy));
-        result.put("call-sites", graph.toJSON());
-
+        if (graph != null) {
+            result.put("call-sites", graph.toJSON());
+        }
+        if (sourceCallSites != null) {
+            result.put("sourceMethods", sourceCallSites.toJSON());
+        }
         return result;
     }
 

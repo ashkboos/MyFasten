@@ -21,12 +21,15 @@ package eu.fasten.core.data.callableindex;
 import eu.fasten.core.data.FastenJavaURI;
 import eu.fasten.core.data.FastenURI;
 import eu.fasten.core.merge.CallGraphUtils;
-import eu.fasten.core.utils.FastenUriUtils;
 import it.unimi.dsi.fastutil.HashCommon;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import org.apache.commons.lang.StringUtils;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 /**
  * This class contains the metadata associated with the nodes of a call graph.
@@ -36,6 +39,40 @@ import org.apache.commons.lang.StringUtils;
  */
 
 public class SourceCallSites {
+
+    public SourceCallSites(final JSONArray json) {
+        this.sourceId2SourceInf = new Long2ObjectOpenHashMap<>();
+
+        for (int i = 0; i < json.length(); i++) {
+            JSONObject sourceMethodObj = json.getJSONObject(i);
+            long id = sourceMethodObj.getLong("id");
+            String sourceUri = sourceMethodObj.getString("sourceUri");
+
+            JSONArray callSitesArray = sourceMethodObj.getJSONArray("callSites");
+            Set<CallSite> callSites = new HashSet<>();
+
+            for (int j = 0; j < callSitesArray.length(); j++) {
+                JSONObject callSiteObj = callSitesArray.getJSONObject(j);
+                int line = callSiteObj.getInt("line");
+                CallSite.InvocationInstruction invocationInstruction = CallSite.InvocationInstruction.valueOf(callSiteObj.getString("invocationInstruction"));
+                String targetSignature = callSiteObj.getString("targetSignature");
+
+                JSONArray receiverTypesArray = callSiteObj.getJSONArray("receiverTypes");
+                List<String> receiverTypes = new ArrayList<>();
+
+                for (int k = 0; k < receiverTypesArray.length(); k++) {
+                    receiverTypes.add(receiverTypesArray.getString(k));
+                }
+
+                CallSite callSite = new CallSite(line, invocationInstruction, targetSignature, receiverTypes);
+                callSites.add(callSite);
+            }
+
+            SourceMethodInf sourceMethodInf = new SourceMethodInf(sourceUri, callSites);
+            this.sourceId2SourceInf.put(id, sourceMethodInf);
+        }
+    }
+
     /**
      * This class represent the metadata associated with a node. The FASTEN Java URI is split into the
      * type part, and the signature part.
@@ -204,4 +241,50 @@ public class SourceCallSites {
         this.sourceId2SourceInf = sourceId2SourceInf;
     }
 
+    public JSONArray toJSON() {
+        JSONArray sourceMethodsArray = new JSONArray();
+        sourceId2SourceInf.forEach((key, value) -> {
+            JSONObject sourceMethodObj = new JSONObject();
+            sourceMethodObj.put("id", key);
+            sourceMethodObj.put("sourceUri", value.sourceUri);
+
+            JSONArray callSitesArray = new JSONArray();
+            value.callSites.forEach(callSite -> {
+                JSONObject callSiteObj = new JSONObject();
+                callSiteObj.put("line", callSite.line);
+                callSiteObj.put("invocationInstruction", callSite.invocationInstruction.toString());
+                callSiteObj.put("targetSignature", callSite.targetSignature);
+
+                JSONArray receiverTypesArray = new JSONArray();
+                callSite.receiverTypes.forEach(receiverTypesArray::put);
+                callSiteObj.put("receiverTypes", receiverTypesArray);
+
+                callSitesArray.put(callSiteObj);
+            });
+
+            sourceMethodObj.put("callSites", callSitesArray);
+            sourceMethodsArray.put(sourceMethodObj);
+        });
+
+        return sourceMethodsArray;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+
+        SourceCallSites that = (SourceCallSites) o;
+
+        return sourceId2SourceInf.equals(that.sourceId2SourceInf);
+    }
+
+    @Override
+    public int hashCode() {
+        return sourceId2SourceInf.hashCode();
+    }
 }

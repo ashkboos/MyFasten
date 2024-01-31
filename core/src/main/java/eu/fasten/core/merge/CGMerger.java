@@ -18,6 +18,8 @@
 
 package eu.fasten.core.merge;
 
+import static eu.fasten.core.utils.FilesUtils.getFileFromResources;
+
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import eu.fasten.core.data.ClassHierarchy;
@@ -38,6 +40,8 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.LongLongPair;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -60,7 +64,7 @@ public class CGMerger {
 
     private static final Logger logger = LoggerFactory.getLogger(CGMerger.class);
 
-    private final ClassHierarchy classHierarchy;
+    private ClassHierarchy classHierarchy;
     private Map<String, String> toPruneSig2Type = new HashMap<>();
 
     private DSLContext dbContext;
@@ -126,6 +130,25 @@ public class CGMerger {
         this.classHierarchy = new ClassHierarchy(dependencySet, dbContext, rocksDao);
     }
 
+    public CGMerger(final List<PartialJavaCallGraph> dependencySet,
+                    final String generator) {
+        final var javaCHResourceName = "Java_" + generator + "_hierarchy.json";
+        final var javaCH = includeJavaCH(javaCHResourceName);
+        dependencySet.add(javaCH);
+        setCHAndUris(dependencySet, false);
+    }
+
+    private PartialJavaCallGraph includeJavaCH(final String javaCHResourceName) {
+        final var javaCHFile = getFileFromResources(javaCHResourceName);
+        final String javaCGStr;
+        try {
+            javaCGStr = Files.readString(javaCHFile.toPath());
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        return new PartialJavaCallGraph(new JSONObject(javaCGStr));
+    }
+
     /**
      * Creates instance of callgraph merger.
      *
@@ -135,6 +158,11 @@ public class CGMerger {
      */
     public CGMerger(final List<PartialJavaCallGraph> dependencySet, boolean withExternals) {
 
+        setCHAndUris(dependencySet, withExternals);
+    }
+
+    private void setCHAndUris(final List<PartialJavaCallGraph> dependencySet,
+                              final boolean withExternals) {
         this.allUris = HashBiMap.create();
         if (withExternals) {
             this.externalUris = new HashMap<>();
@@ -214,7 +242,7 @@ public class CGMerger {
         for (final var directedERCGPair : this.ercgDependencySet) {
             if (cg.uri.equals(directedERCGPair.getRight().uri)) {
                 if (directedERCGPair.getRight().sourceCallSites == null) {
-                    directedERCGPair.getRight().setSourceCallSites(this.allUris.inverse());
+                    directedERCGPair.getRight().setSourceCallSitesToOptimizeMerge(this.allUris.inverse());
                 }
                 return mergeWithCHA(directedERCGPair.getKey(),
                     directedERCGPair.getRight().sourceCallSites);
@@ -399,7 +427,7 @@ public class CGMerger {
         if (this.dbContext == null) {
             for (final var dep : this.ercgDependencySet) {
                 if (dep.getRight().sourceCallSites == null) {
-                    dep.getRight().setSourceCallSites(this.allUris.inverse());
+                    dep.getRight().setSourceCallSitesToOptimizeMerge(this.allUris.inverse());
                 }
                 DirectedGraph merged = mergeWithCHA(dep.getKey(), dep.getRight().sourceCallSites);
                 if (merged != null) {

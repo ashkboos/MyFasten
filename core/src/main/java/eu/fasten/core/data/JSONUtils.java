@@ -3,6 +3,7 @@ package eu.fasten.core.data;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import eu.fasten.core.data.callableindex.SourceCallSites;
 import eu.fasten.core.data.opal.MavenCoordinate;
 import it.unimi.dsi.fastutil.longs.LongLongPair;
 import java.util.HashMap;
@@ -94,6 +95,7 @@ public class JSONUtils {
         appendArtifactInformation(result, erjcg);
         appendCha(result, erjcg.classHierarchy);
         appendGraph(result, erjcg.getGraph());
+        appendSourceCallSites(result, erjcg.sourceCallSites);
         if (erjcg.timestamp >= 0) {
             appendKeyValue(result, "timestamp", erjcg.timestamp, true);
         }
@@ -102,6 +104,63 @@ public class JSONUtils {
         }
         result.append("}");
         return result.toString();
+    }
+
+    public static void appendSourceCallSites(StringBuilder builder, SourceCallSites sourceCallSites) {
+        if (sourceCallSites == null) {
+            return;
+        }
+        builder.append("\"sourceMethods\":[");
+
+        boolean firstMethod = true;
+        for (Long id : sourceCallSites.sourceId2SourceInf.keySet()) {
+            if (!firstMethod) {
+                builder.append(",");
+            }
+            firstMethod = false;
+
+            SourceCallSites.SourceMethodInf sourceMethodInf = sourceCallSites.sourceId2SourceInf.get(id);
+
+            builder.append("{\"id\":");
+            builder.append(id);
+            builder.append(",\"sourceUri\":\"");
+            builder.append(sourceMethodInf.sourceUri);
+            builder.append("\",\"callSites\":[");
+
+            boolean firstCallSite = true;
+            for (SourceCallSites.CallSite callSite : sourceMethodInf.callSites) {
+                if (!firstCallSite) {
+                    builder.append(",");
+                }
+                firstCallSite = false;
+
+                builder.append("{\"line\":");
+                builder.append(callSite.line);
+                builder.append(",\"invocationInstruction\":\"");
+                builder.append(callSite.invocationInstruction.toString());
+                builder.append("\",\"targetSignature\":\"");
+                builder.append(callSite.targetSignature);
+                builder.append("\",\"receiverTypes\":[");
+
+                boolean firstReceiverType = true;
+                for (String receiverType : callSite.receiverTypes) {
+                    if (!firstReceiverType) {
+                        builder.append(",");
+                    }
+                    firstReceiverType = false;
+
+                    builder.append("\"");
+                    builder.append(receiverType);
+                    builder.append("\"");
+                }
+
+                builder.append("]}");
+            }
+
+            builder.append("]}");
+        }
+
+        builder.append("],");
     }
 
     /**
@@ -125,6 +184,9 @@ public class JSONUtils {
      * @param result the StringBuilder to append the information.
      */
     private static void appendGraph(StringBuilder result, final JavaGraph graph) {
+        if (graph == null) {
+            return;
+        }
         result.append("\"call-sites\":[");
         for (final var entry : graph.getCallSites().entrySet()) {
             appendCall(result, entry);

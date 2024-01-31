@@ -473,7 +473,7 @@ public class CGandStitchingTest {
         }
         assertEquals(1662, pcg.getCallSites().size());
 
-        pcg.setSourceCallSites();
+        pcg.setSourceCallSitesToOptimizeMerge();
         for (final var source : pcg.sourceCallSites.sourceId2SourceInf.long2ObjectEntrySet()) {
             for (SourceCallSites.CallSite callSite : source.getValue().callSites) {
                 sigsInSourceCS.add(callSite.targetSignature);
@@ -531,7 +531,7 @@ public class CGandStitchingTest {
 
         WalaResultAnalyzer.wrap(callgraph, pcg, CallPreservationStrategy.ONLY_STATIC_CALLSITES);
         if (partial) {
-            pcg.setSourceCallSites();
+            pcg.setSourceCallSitesToOptimizeMerge();
             pcg.setGraph(new JavaGraph());
         }
         return pcg;

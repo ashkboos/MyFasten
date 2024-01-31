@@ -66,12 +66,20 @@ class JSONUtilsTest {
 
     @Disabled
     @Test
-    void toJSONString() throws IOException {
+    void testSourceInf() throws IOException {
+        final var graph = JSONUtilsTest.graph;
+        graph.setSourceCallSitesToOptimizeMerge();
+        final var ser1 = avgConsumption(graph, "direct", "direct", 20, 20);
+        final var ser2 = avgConsumption(graph, "jsonObject", "jsonObject", 20, 20);
+        JSONAssert.assertEquals(ser1, ser2, JSONCompareMode.LENIENT);
+    }
 
+    @Disabled
+    @Test
+    void toJSONString() throws IOException {
         final var ser1 = avgConsumption(graph, "direct", "direct", 20, 20);
         final var ser2 = avgConsumption(graph, "jsonObject", "jsonObject", 20, 20);
         JSONAssert.assertEquals(ser1, ser2, JSONCompareMode.STRICT);
-
     }
 
     @Test
@@ -81,6 +89,17 @@ class JSONUtilsTest {
         Assertions.assertTrue(rcgString.endsWith("]]}"));
         JSONAssert.assertEquals(rcg.toJSON().toString(), rcgString,
             JSONCompareMode.STRICT);
+    }
+
+    @Disabled
+    @Test
+    void mergedGraphTestSourceInf() throws IOException {
+
+        artifact.setSourceCallSitesToOptimizeMerge();
+        final var ser1 = avgConsumption(artifact, "direct", "direct", 20, 20);
+        final var ser2 = avgConsumption(artifact, "jsonObject", "jsonObject", 20, 20);
+        JSONAssert.assertEquals(ser1, ser2, JSONCompareMode.STRICT);
+
     }
 
     @Disabled
@@ -104,7 +123,7 @@ class JSONUtilsTest {
             MavenCoordinate coord = coords.get(i);
             final var cg = OPALPartialCallGraphConstructor.createPartialJavaCG(coord,
                 CGAlgorithm.CHA, 1574072773, MavenUtilities.getRepos().get(0), CallPreservationStrategy.ONLY_STATIC_CALLSITES);
-
+            cg.setSourceCallSitesToOptimizeMerge();
             logger.debug("Serialization for: {}", coord.getCoordinate());
             final var ser1 = avgConsumption(cg, "direct", "direct", 20, 20);
             final var ser2 = avgConsumption(cg, "jsonObject", "jsonObject", 20, 20);

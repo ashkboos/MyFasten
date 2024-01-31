@@ -136,8 +136,8 @@ public class JavaGraph {
         final var callsJson = new JSONArray();
         for (final var entry : this.callSites.entrySet()) {
             final var call = new JSONArray();
-            call.put(entry.getKey().first().toString());
-            call.put(entry.getKey().second().toString());
+            call.put(String.valueOf(entry.getKey().firstLong()));
+            call.put(String.valueOf(entry.getKey().secondLong()));
             call.put(new JSONObject(entry.getValue()));
             callsJson.put(call);
         }
